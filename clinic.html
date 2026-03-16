@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard Comercial Sala de Terapias</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --panel2:#111827;
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+  --line:#334155;
+  --ok:#22c55e;
+  --warn:#f59e0b;
+  --danger:#ef4444;
+  --accent:#38bdf8;
+}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:24px}
+h1{margin:0 0 6px}
+p{margin:0}.container{max-width:1550px;margin:auto}
+.topbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+.note{color:var(--muted);line-height:1.4}.actions{display:flex;gap:10px;flex-wrap:wrap}
+button,.file-label,select{background:#0b5ed7;color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
+.file-label{display:inline-block;background:#475569}input[type="file"]{display:none}
+select{background:var(--panel2);border:1px solid var(--line);min-width:170px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;margin-bottom:22px}
+.card,.section,.setup,.filters-wrap{background:var(--panel);padding:18px;border-radius:14px}.card h3{margin:0;font-size:14px;color:var(--muted)}
+.card p{font-size:28px;margin:8px 0 0;font-weight:700}.section{margin-bottom:22px}.section h3{margin:0 0 14px}
+canvas{max-height:340px}.table{width:100%;border-collapse:collapse;margin-top:8px}.table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left}.table th{color:var(--muted)}
+.status{margin:0 0 18px;padding:12px 14px;border-radius:12px;background:#172554;color:#bfdbfe}.status.error{background:#450a0a;color:#fecaca}.status.ok{background:#052e16;color:#bbf7d0}
+.setup{margin-bottom:22px;display:none}.setup h3{margin:0 0 10px}.setup ol{margin:8px 0 0 18px;padding:0;line-height:1.5}.setup code,.hint code{background:var(--panel2);padding:3px 6px;border-radius:6px;color:#cbd5e1}
+textarea{width:100%;min-height:120px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:12px;resize:vertical}
+.hint{color:var(--muted);margin-top:10px;line-height:1.5}.small-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.filters-wrap{margin-bottom:22px}.filters-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.filter-item label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.section-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.badge{padding:6px 10px;border-radius:999px;background:rgba(56,189,248,.15);color:#7dd3fc;font-size:12px;font-weight:700}
+@media (max-width:1300px){.grid{grid-template-columns:repeat(3,1fr)}.filters-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:1100px){.grid{grid-template-columns:repeat(2,1fr)}.small-grid{grid-template-columns:1fr}.filters-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:700px){.grid,.filters-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="topbar">
+    <div>
+      <h1>Dashboard Comercial Sala de Terapias</h1>
+      <p class="note">Versión más clara e interactiva. Cambié la venta por día por una vista mensual y el mix ahora usa <b>descripción</b> para facilitar la lectura.</p>
+    </div>
+    <div class="actions">
+      <button id="btnConectar">Conectar Google Sheets</button>
+      <button id="btnRecargar">Recargar hoja</button>
+      <label class="file-label" for="fileCsv">Cargar CSV local</label>
+      <input id="fileCsv" type="file" accept=".csv,text/csv" />
+    </div>
+  </div>
+
+  <div id="status" class="status">Dashboard pre cargado con el archivo clinica_final.csv. Puedes filtrar por mes, vendedor, descripcion, tipo y segmento.</div>
+
+  <div class="filters-wrap">
+    <div class="section-head">
+      <h3 style="margin:0">Filtros interactivos</h3>
+      <span class="badge">Se aplican a todo el dashboard</span>
+    </div>
+    <div class="filters-grid" style="margin-top:12px">
+      <div class="filter-item">
+        <label for="filterMes">Mes</label>
+        <select id="filterMes"></select>
+      </div>
+      <div class="filter-item">
+        <label for="filterVendedor">Vendedor</label>
+        <select id="filterVendedor"></select>
+      </div>
+      <div class="filter-item">
+        <label for="filterDescripcion">Descripcion</label>
+        <select id="filterDescripcion"></select>
+      </div>
+      <div class="filter-item">
+        <label for="filterTipo">Tipo</label>
+        <select id="filterTipo"></select>
+      </div>
+      <div class="filter-item">
+        <label for="filterSegmento">Segmento</label>
+        <select id="filterSegmento"></select>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button id="btnLimpiarFiltros" style="background:#475569">Limpiar filtros</button>
+    </div>
+  </div>
+
+  <div class="setup">
+    <h3>Conexion recomendada</h3>
+    <ol>
+      <li>En Google Sheets abre tu archivo y la hoja <code>Base</code>.</li>
+      <li>Ve a <code>Archivo → Compartir → Publicar en la web</code>.</li>
+      <li>Publica solo la hoja <code>Base</code> como <code>CSV</code>.</li>
+      <li>Luego presiona <code>Conectar Google Sheets</code> y permite el acceso a la red.</li>
+      <li>Si no deseas red, usa <code>Cargar CSV local</code>.</li>
+    </ol>
+    <div class="hint">El dashboard ahora prioriza vistas más fáciles de leer: mes, categorías, descuentos y clientes. Ya no usa una gráfica diaria recargada.</div>
+  </div>
+
+  <div class="setup">
+    <h3>URL CSV publicada</h3>
+    <textarea id="csvUrlInput" style="min-height:90px" placeholder="Pega aqui la URL CSV publicada de Google Sheets si deseas usar una URL personalizada..."></textarea>
+    <div class="hint">Ejemplo esperado: <code>https://docs.google.com/spreadsheets/d/TU_ID/pub?gid=0&amp;single=true&amp;output=csv</code></div>
+  </div>
+
+  <div class="setup">
+    <h3>Pegar CSV manualmente</h3>
+    <textarea id="csvInput" placeholder="Pega aqui el contenido CSV de la hoja Base si lo necesitas..."></textarea>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+      <button id="btnProcesarCsv">Procesar CSV pegado</button>
+      <button id="btnDemo" style="background:#475569">Cargar demo</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h3>Ventas Totales</h3><p id="ventas">Q 0</p></div>
+    <div class="card"><h3>Sesiones</h3><p id="sesiones">0</p></div>
+    <div class="card"><h3>Ticket Promedio</h3><p id="ticket">Q 0</p></div>
+    <div class="card"><h3>Clientes unicos</h3><p id="clientes">0</p></div>
+    <div class="card"><h3>% descuento global</h3><p id="descuentoGlobal">0%</p></div>
+  </div>
+
+  <div class="section">
+    <h3>Comparativo mensual de ventas</h3>
+    <canvas id="ventasMensuales"></canvas>
+  </div>
+
+  <div class="small-grid">
+    <div class="section">
+      <h3>Mix por descripcion</h3>
+      <canvas id="segmento"></canvas>
+    </div>
+    <div class="section">
+      <h3>Top categorias por descripcion</h3>
+      <canvas id="servicios"></canvas>
+    </div>
+  </div>
+
+  <div class="small-grid">
+    <div class="section">
+      <h3>Descuento por categoria</h3>
+      <canvas id="descuento"></canvas>
+    </div>
+    <div class="section">
+      <h3>Pareto 80/20 de ingresos</h3>
+      <canvas id="pareto"></canvas>
+    </div>
+  </div>
+
+  <div class="small-grid">
+    <div class="section">
+      <h3>Comparativo mensual: ventas vs descuentos</h3>
+      <canvas id="mensual"></canvas>
+    </div>
+    <div class="section">
+      <h3>Top tipos / servicios</h3>
+      <canvas id="tipo"></canvas>
+    </div>
+  </div>
+
+  <div class="small-grid">
+    <div class="section">
+      <h3>Top clientes</h3>
+      <table class="table" id="tablaClientes"></table>
+    </div>
+    <div class="section">
+      <h3>Top vendedores</h3>
+      <table class="table" id="tablaVendedores"></table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Comparativo comercial</h3>
+    <table class="table" id="tablaComparativo"></table>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1rkta2b0FYq9IE8WpNKZwKr8UsbYq4UfV';
+const SHEET_NAME = 'Base';
+const defaultUrls = [
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`,
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`,
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?gid=0&single=true&output=csv`
+];
+
+const EMBEDDED_DATA = {"ventas": 1446750.31, "sesiones": 9976, "clientesCount": 1386, "totalSinDescuento": 1453229.84, "totalDescuento": 6479.53, "ventasDia": {"2023-01-03": 610.0, "2023-01-04": 1510.0}, "ventasMes": {"2023-01": 99275.0, "2023-02": 100930.23, "2023-03": 109916.8, "2023-04": 97220.0, "2023-05": 101642.82, "2023-06": 131065.0, "2023-07": 143100.0, "2025-04": 10011.0, "2025-05": 12588.08, "2025-06": 22406.0, "2025-07": 29445.0, "2025-08": 21115.0}, "descuentoMes": {"2023-01": 300.0, "2023-02": 339.77, "2023-03": 185.0, "2023-04": 0.0, "2023-05": 132.18, "2023-06": 1350.0, "2023-07": 800.0, "2025-04": 45.0, "2025-05": 31.92, "2025-06": 845.0, "2025-07": 350.0, "2025-08": 2100.0}, "segmento": {"57595": 241600.0, "44458": 220155.0}, "descripcion": {"TERAPIA": 1021552.5, "MEDICAMENTO": 210042.58, "P.CONSULTA": 168870.0, "SIN PRECIO EN FACTURACIÓN": 38010.0, "PROD.VARIOS": 3264.23, "CANCELADO": 2725.0, "INSUMO": 1565.0, "SUPLEMENTO": 676.0, "SERVICIO": 45.0}, "descuentos": {"TERAPIA": 4229.53, "MEDICAMENTO": 1700.0, "P.CONSULTA": 550.0, "SUPLEMENTO": 0.0, "SIN PRECIO EN FACTURACIÓN": 0.0, "SERVICIO": 0.0, "PROD.VARIOS": 0.0, "INSUMO": 0.0, "CANCELADO": 0.0}, "ventasCliente": {"Margarita Morales de Cifuentes": 9970.0, "Shirley Paiz": 7610.0, "Anderson Leonel Melgar Escobar": 7440.0, "Gerson Iván Cabrera Chávez": 6120.0, "Mayra Tiu": 5540.0, "Elsa Lara": 5335.0, "Lenin Leonel Urrutia Castillo": 5040.0, "Javy Siquival": 4990.0, "Belen Ballbe": 4760.0, "Albania Jucelma Linares Chacón": 4720.0}, "ventasVendedor": {"Jakelline López": 306585.0, "Sofia Güigüi": 299762.9, "Deysi Paz": 180431.1, "Carlos Mamani": 169265.0, "Daniela López": 163375.0, "Karen Miranda": 145278.23, "Lilian del Cid": 90053.08, "Ramón Mijangos": 40985.0, "Jesús Gómez": 28795.0, "Patricia de León": 14475.0}, "tipo": {"Terapia": 170250.0, "Primera Consulta": 100080.0, "Terapia ": 89575.0, "Apiterapia o TN": 63200.0, "Masaje Relajante/ Reflexologia": 41850.0, "Acupuntura y terapia": 33000.0, "Otros": 31815.0, "Suero de ozono": 27465.0, "Analia": 25000.0, "Bono 4 Terapias": 23005.0, "Acupuntura": 20675.0, "Masaje": 20470.0}, "sourceName": "clinica_final.csv"};
+
+const chartInstances = {};
+const statusEl = document.getElementById('status');
+let currentRows = [];
+let currentData = null;
+let currentSource = 'clinica_final.csv precargado';
+
+function setStatus(message, kind = '') { statusEl.innerHTML = message; statusEl.className = `status ${kind}`.trim(); }
+function detectDelimiter(csvText) { const firstLine = String(csvText || '').split(/\r?\n/)[0] || ''; const semicolons = (firstLine.match(/;/g) || []).length; const commas = (firstLine.match(/,/g) || []).length; return semicolons > commas ? ';' : ','; }
+function parseCsv(csvText) {
+  const delimiter = detectDelimiter(csvText); const rows = []; let row = []; let value = ''; let insideQuotes = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i]; const next = csvText[i + 1];
+    if (char === '"') { if (insideQuotes && next === '"') { value += '"'; i += 1; } else { insideQuotes = !insideQuotes; } }
+    else if (char === delimiter && !insideQuotes) { row.push(value); value = ''; }
+    else if ((char === '\n' || char === '\r') && !insideQuotes) { if (char === '\r' && next === '\n') i += 1; row.push(value); if (row.some(cell => String(cell).trim() !== '')) rows.push(row); row = []; value = ''; }
+    else { value += char; }
+  }
+  if (value.length > 0 || row.length > 0) { row.push(value); if (row.some(cell => String(cell).trim() !== '')) rows.push(row); }
+  if (rows.length > 0 && rows[0].length > 0) rows[0][0] = String(rows[0][0]).replace(/^\uFEFF/, '');
+  return rows;
+}
+function normalizeHeader(text) { return String(text || '').trim().replace(/^\uFEFF/, '').replace(/\s+/g, ' ').toLowerCase(); }
+function toNumber(val) { if (val === null || val === undefined) return 0; const cleaned = String(val).trim().replace(/[Q$\s]/g, '').replace(/%/g, '').replace(/,(?=\d{3}(\D|$))/g, '').replace(/,(?=\d{1,2}$)/g, '.'); const num = Number(cleaned); return Number.isFinite(num) ? num : 0; }
+function safeText(val, fallback = 'Sin dato') { const txt = String(val ?? '').trim(); return txt || fallback; }
+function formatMoney(n) { return `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
+function getColumnIndex(headers, candidates) { const normalized = headers.map(normalizeHeader); for (const candidate of candidates) { const idx = normalized.indexOf(normalizeHeader(candidate)); if (idx >= 0) return idx; } return -1; }
+function ensureRequiredColumns(headers) {
+  const required = { fecha:['1_fecha'], cliente:['2_cliente'], vendedor:['3_vendedor'], unidades:['4_unidades vendidas','4_unidades_vendidas'], segmento:['9_codigo_segmento'], descripcion:['11_descripcino','11_descripcion'], tipo:['10_tipo'], precioSinDesc:['10_1preciosindescuento','10_1 preciosindescuento'], descuento:['10_2descuento','10_2 descuento'], facturado:['10_3facturado','10_3 facturado'] };
+  const result = {}; for (const key of Object.keys(required)) result[key] = getColumnIndex(headers, required[key]);
+  const missing = Object.entries(result).filter(([, idx]) => idx === -1).map(([k]) => k); if (missing.length) throw new Error(`Faltan columnas requeridas: ${missing.join(', ')}`); return result;
+}
+function destroyCharts() { Object.values(chartInstances).forEach(chart => { if (chart && typeof chart.destroy === 'function') chart.destroy(); }); }
+function buildChart(id, config) { if (chartInstances[id]) chartInstances[id].destroy(); chartInstances[id] = new Chart(document.getElementById(id), config); }
+function parseDateLabel(value) { const text = safeText(value, ''); const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/); if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`; const dmYhm = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+\d{1,2}:\d{2})?$/); if (dmYhm) return `${dmYhm[3]}-${String(dmYhm[2]).padStart(2,'0')}-${String(dmYhm[1]).padStart(2,'0')}`; return text; }
+function monthLabel(dateLabel) { return String(dateLabel || '').slice(0,7); }
+function sortedEntries(obj, limit = null) { const arr = Object.entries(obj || {}).sort((a,b) => b[1] - a[1]); return limit ? arr.slice(0, limit) : arr; }
+function formatMonthLabel(m){ if(!m) return 'Sin mes'; const [y,mm]=m.split('-'); return `${mm}/${y}`; }
+function destroyAndRender(data){ destroyCharts(); updateKpis(data); renderCharts(data); renderTables(data); }
+
+function aggregateData(rows) {
+  const headers = rows[0] || []; const indexes = ensureRequiredColumns(headers); const body = rows.slice(1);
+  let ventas = 0, sesiones = 0, totalSinDescuento = 0, totalDescuento = 0; const clientes = new Set();
+  const ventasMes = {}, descuentoMes = {}, segmento = {}, descripcion = {}, descuentos = {}, ventasCliente = {}, ventasVendedor = {}, tipo = {};
+  body.forEach(r => {
+    const fecha = parseDateLabel(r[indexes.fecha]); const mes = monthLabel(fecha); const cliente = safeText(r[indexes.cliente], 'Cliente no identificado'); const vendedor = safeText(r[indexes.vendedor], 'Sin vendedor');
+    const unidades = toNumber(r[indexes.unidades]); const segmentoCod = safeText(r[indexes.segmento], 'Sin segmento'); const desc = safeText(r[indexes.descripcion], 'Sin descripcion'); const tipoTxt = safeText(r[indexes.tipo], 'Sin tipo');
+    const precioSinDesc = toNumber(r[indexes.precioSinDesc]); const descuento = toNumber(r[indexes.descuento]); const facturado = toNumber(r[indexes.facturado]);
+    ventas += facturado; sesiones += unidades; totalSinDescuento += precioSinDesc; totalDescuento += descuento; clientes.add(cliente);
+    if (mes) { ventasMes[mes] = (ventasMes[mes] || 0) + facturado; descuentoMes[mes] = (descuentoMes[mes] || 0) + descuento; }
+    segmento[segmentoCod] = (segmento[segmentoCod] || 0) + facturado; descripcion[desc] = (descripcion[desc] || 0) + facturado; descuentos[desc] = (descuentos[desc] || 0) + descuento; ventasCliente[cliente] = (ventasCliente[cliente] || 0) + facturado; ventasVendedor[vendedor] = (ventasVendedor[vendedor] || 0) + facturado; tipo[tipoTxt] = (tipo[tipoTxt] || 0) + facturado;
+  });
+  return { ventas, sesiones, clientesCount: clientes.size, totalSinDescuento, totalDescuento, ventasMes, descuentoMes, segmento, descripcion, descuentos, ventasCliente, ventasVendedor, tipo };
+}
+
+function buildRowsFromEmbedded(data){
+  const rows = [[ '1_fecha','2_cliente','3_vendedor','4_unidades vendidas','9_codigo_segmento','10_tipo','11_Descripcino','10_1PrecioSinDescuento','10_2descuento','10_3Facturado' ]];
+  const months = Object.keys(data.ventasMes || {}).sort();
+  months.forEach((mes,idx)=>{
+    rows.push([`${mes}-01`,`Cliente ${idx+1}`,'Vendedor demo',1,`SEG${idx+1}`,'Tipo demo','TERAPIA',Number(data.ventasMes[mes]||0)+Number(data.descuentoMes?.[mes]||0),Number(data.descuentoMes?.[mes]||0),Number(data.ventasMes[mes]||0)]);
+  });
+  return rows;
+}
+
+function getFilterState(){
+  return {
+    mes: document.getElementById('filterMes').value,
+    vendedor: document.getElementById('filterVendedor').value,
+    descripcion: document.getElementById('filterDescripcion').value,
+    tipo: document.getElementById('filterTipo').value,
+    segmento: document.getElementById('filterSegmento').value,
+  };
+}
+
+function populateSelect(id, items, keepAllText='Todos'){
+  const select = document.getElementById(id);
+  const current = select.value;
+  select.innerHTML = `<option value="">${keepAllText}</option>` + items.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}">${v}</option>`).join('');
+  if(items.includes(current)) select.value = current;
+}
+
+function populateFiltersFromRows(rows){
+  const headers = rows[0] || []; if(headers.length===0) return;
+  const idx = ensureRequiredColumns(headers); const body = rows.slice(1);
+  const meses = [...new Set(body.map(r=>monthLabel(parseDateLabel(r[idx.fecha]))).filter(Boolean))].sort();
+  const vendedores = [...new Set(body.map(r=>safeText(r[idx.vendedor],'Sin vendedor')))].sort();
+  const descripciones = [...new Set(body.map(r=>safeText(r[idx.descripcion],'Sin descripcion')))].sort();
+  const tipos = [...new Set(body.map(r=>safeText(r[idx.tipo],'Sin tipo')))].sort();
+  const segmentos = [...new Set(body.map(r=>safeText(r[idx.segmento],'Sin segmento')))].sort();
+  populateSelect('filterMes', meses.map(formatMonthLabel), 'Todos los meses');
+  const mesMap = {};
+  meses.forEach(m => mesMap[formatMonthLabel(m)] = m);
+  document.getElementById('filterMes').dataset.map = JSON.stringify(mesMap);
+  populateSelect('filterVendedor', vendedores, 'Todos los vendedores');
+  populateSelect('filterDescripcion', descripciones, 'Todas las descripciones');
+  populateSelect('filterTipo', tipos, 'Todos los tipos');
+  populateSelect('filterSegmento', segmentos, 'Todos los segmentos');
+}
+
+function applyFilters(){
+  if(!currentRows.length){
+    if(currentData) destroyAndRender(currentData);
+    return;
+  }
+  const headers = currentRows[0];
+  const idx = ensureRequiredColumns(headers);
+  const state = getFilterState();
+  const mesMap = JSON.parse(document.getElementById('filterMes').dataset.map || '{}');
+  const mesInternal = mesMap[state.mes] || '';
+  const filtered = [headers, ...currentRows.slice(1).filter(r => {
+    const rowMes = monthLabel(parseDateLabel(r[idx.fecha]));
+    const vendedor = safeText(r[idx.vendedor],'Sin vendedor');
+    const descripcion = safeText(r[idx.descripcion],'Sin descripcion');
+    const tipo = safeText(r[idx.tipo],'Sin tipo');
+    const segmento = safeText(r[idx.segmento],'Sin segmento');
+    return (!mesInternal || rowMes === mesInternal)
+      && (!state.vendedor || vendedor === state.vendedor)
+      && (!state.descripcion || descripcion === state.descripcion)
+      && (!state.tipo || tipo === state.tipo)
+      && (!state.segmento || segmento === state.segmento);
+  })];
+  const data = aggregateData(filtered);
+  destroyAndRender(data);
+  setStatus(`Datos cargados correctamente desde ${currentSource}. Registros filtrados: ${Math.max(filtered.length - 1, 0)}.`, 'ok');
+}
+
+function clearFilters(){
+  ['filterMes','filterVendedor','filterDescripcion','filterTipo','filterSegmento'].forEach(id => document.getElementById(id).value='');
+  applyFilters();
+}
+
+function updateKpis(data) {
+  const ticket = data.sesiones ? data.ventas / data.sesiones : 0; const descuentoPct = data.totalSinDescuento ? (data.totalDescuento / data.totalSinDescuento) * 100 : 0;
+  document.getElementById('ventas').textContent = formatMoney(data.ventas); document.getElementById('sesiones').textContent = Number(data.sesiones).toLocaleString('es-GT'); document.getElementById('ticket').textContent = formatMoney(ticket); document.getElementById('clientes').textContent = Number(data.clientesCount).toLocaleString('es-GT'); document.getElementById('descuentoGlobal').textContent = `${descuentoPct.toFixed(2)}%`;
+}
+
+function renderCharts(data) {
+  const mesesBase = Object.keys(data.ventasMes).sort();
+  buildChart('ventasMensuales', { type:'bar', data:{ labels:mesesBase.map(formatMonthLabel), datasets:[{ label:'Ventas', data:mesesBase.map(m => data.ventasMes[m]), backgroundColor:'rgba(56,189,248,0.55)', borderColor:'#38bdf8', borderWidth:1 }] }, options:{ responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } } } } });
+
+  const mixDesc = sortedEntries(data.descripcion, 8);
+  buildChart('segmento', { type:'doughnut', data:{ labels:mixDesc.map(x=>x[0]), datasets:[{ data:mixDesc.map(x=>x[1]) }] }, options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#e5e7eb' } } } } });
+
+  const desc = sortedEntries(data.descripcion, 10); buildChart('servicios', { type:'bar', data:{ labels:desc.map(x=>x[0]), datasets:[{ label:'Ingresos', data:desc.map(x=>x[1]), backgroundColor:'rgba(34,197,94,0.55)' }] }, options:{ indexAxis:'y', responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } } } } });
+  const dsc = sortedEntries(data.descuentos, 10); buildChart('descuento', { type:'bar', data:{ labels:dsc.map(x=>x[0]), datasets:[{ label:'Descuento', data:dsc.map(x=>x[1]), backgroundColor:'rgba(239,68,68,0.55)' }] }, options:{ indexAxis:'y', responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } } } } });
+  const paretoBase = sortedEntries(data.descripcion); const totalPareto = paretoBase.reduce((acc,[,v]) => acc + v, 0) || 1; let acumulado = 0; const paretoLine = paretoBase.map(([,v]) => { acumulado += v; return Number(((acumulado / totalPareto) * 100).toFixed(2)); });
+  buildChart('pareto', { data:{ labels:paretoBase.map(x=>x[0]), datasets:[ { type:'bar', label:'Ingresos', data:paretoBase.map(x=>x[1]), yAxisID:'y' }, { type:'line', label:'% acumulado', data:paretoLine, yAxisID:'y1', borderColor:'#f59e0b', backgroundColor:'#f59e0b', tension:0.25 } ] }, options:{ responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } }, y1:{ position:'right', min:0, max:100, ticks:{ color:'#94a3b8', callback:v => `${v}%` } } } } });
+  buildChart('mensual', { data:{ labels:mesesBase.map(formatMonthLabel), datasets:[ { type:'bar', label:'Ventas', data:mesesBase.map(m => data.ventasMes[m]), yAxisID:'y', backgroundColor:'rgba(34,197,94,0.45)' }, { type:'line', label:'Descuento', data:mesesBase.map(m => data.descuentoMes[m] || 0), yAxisID:'y1', borderColor:'#ef4444', backgroundColor:'#ef4444', tension:0.25 } ] }, options:{ responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } }, y1:{ position:'right', ticks:{ color:'#94a3b8' } } } } });
+  const tipos = sortedEntries(data.tipo, 12); buildChart('tipo', { type:'bar', data:{ labels:tipos.map(x=>x[0]), datasets:[{ label:'Facturado', data:tipos.map(x=>x[1]), backgroundColor:'rgba(99,102,241,0.55)' }] }, options:{ indexAxis:'y', responsive:true, plugins:{ legend:{ labels:{ color:'#e5e7eb' } } }, scales:{ x:{ ticks:{ color:'#94a3b8' } }, y:{ ticks:{ color:'#94a3b8' } } } } });
+}
+
+function renderTables(data) {
+  const topClientes = sortedEntries(data.ventasCliente, 10); const maxCliente = topClientes[0] ? topClientes[0][1] : 0; let htmlClientes = '<tr><th>Cliente</th><th>Venta</th><th>Categoria</th></tr>';
+  topClientes.forEach(([cliente, venta]) => { let categoria = 'Ocasional'; if (venta >= maxCliente * 0.75) categoria = 'VIP'; else if (venta >= maxCliente * 0.4) categoria = 'Frecuente'; htmlClientes += `<tr><td>${cliente}</td><td>${formatMoney(venta)}</td><td>${categoria}</td></tr>`; });
+  document.getElementById('tablaClientes').innerHTML = htmlClientes;
+  const topVendedores = sortedEntries(data.ventasVendedor, 10); let htmlVend = '<tr><th>Vendedor</th><th>Venta</th></tr>'; topVendedores.forEach(([v, venta]) => { htmlVend += `<tr><td>${v}</td><td>${formatMoney(venta)}</td></tr>`; }); document.getElementById('tablaVendedores').innerHTML = htmlVend;
+  const descuentoPct = data.totalSinDescuento ? (data.totalDescuento / data.totalSinDescuento) * 100 : 0; const top1 = sortedEntries(data.descripcion, 1)[0]; const top5 = sortedEntries(data.descripcion, 5).reduce((a,[,v]) => a + v, 0); const total = data.ventas || 1; const top5Pct = (top5 / total) * 100; const tipo1 = sortedEntries(data.tipo, 1)[0];
+  let htmlComp = '<tr><th>Indicador</th><th>Valor</th></tr>';
+  htmlComp += `<tr><td>Descuento total</td><td>${formatMoney(data.totalDescuento)}</td></tr>`;
+  htmlComp += `<tr><td>% descuento sobre precio sin descuento</td><td>${descuentoPct.toFixed(2)}%</td></tr>`;
+  htmlComp += `<tr><td>Categoria lider</td><td>${top1 ? `${top1[0]} · ${formatMoney(top1[1])}` : 'Sin datos'}</td></tr>`;
+  htmlComp += `<tr><td>Top 5 categorias sobre ingresos totales</td><td>${top5Pct.toFixed(2)}%</td></tr>`;
+  htmlComp += `<tr><td>Tipo lider</td><td>${tipo1 ? `${tipo1[0]} · ${formatMoney(tipo1[1])}` : 'Sin datos'}</td></tr>`;
+  htmlComp += `<tr><td>Clientes unicos</td><td>${data.clientesCount}</td></tr>`;
+  document.getElementById('tablaComparativo').innerHTML = htmlComp;
+}
+
+function processDataObject(data, sourceLabel = 'fuente desconocida') {
+  currentData = data;
+  currentSource = sourceLabel;
+  if(!currentRows.length) currentRows = buildRowsFromEmbedded(EMBEDDED_DATA);
+  populateFiltersFromRows(currentRows);
+  destroyAndRender(data);
+  setStatus(`Datos cargados correctamente desde ${sourceLabel}.`, 'ok');
+}
+function processRows(rows, sourceLabel = 'fuente desconocida') { currentRows = rows; populateFiltersFromRows(rows); const data = aggregateData(rows); currentData = data; currentSource = `${sourceLabel}. Registros procesados: ${Math.max(rows.length - 1, 0)}`; destroyAndRender(data); setStatus(`Datos cargados correctamente desde ${currentSource}.`, 'ok'); }
+function getUrls() { const customUrlEl = document.getElementById('csvUrlInput'); const custom = customUrlEl ? customUrlEl.value.trim() : ''; return custom ? [custom, ...defaultUrls] : defaultUrls; }
+async function tryFetchCsv() { let lastError = null; for (const url of getUrls()) { try { const response = await fetch(url, { cache:'no-store' }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const text = await response.text(); const rows = parseCsv(text); if (rows.length < 2) throw new Error('El CSV no contiene suficientes filas.'); return { rows, source:url }; } catch (err) { lastError = err; } } throw lastError || new Error('No fue posible leer Google Sheets.'); }
+async function loadRemote() { setStatus('Intentando cargar datos desde Google Sheets... Si aparece una ventana, debes permitir el acceso a la red.'); try { const { rows, source } = await tryFetchCsv(); processRows(rows, `Google Sheets (${source})`); } catch (err) { setStatus(`No se pudo cargar Google Sheets: ${err.message}. Permite el acceso a la red o usa CSV local.`, 'error'); } }
+function loadDemo() { const demoCsv = `1_fecha,2_cliente,3_vendedor,4_unidades vendidas,5_precio,9_codigo_segmento,10_tipo,11_Descripcino,10_1PrecioSinDescuento,10_2descuento,10_3Facturado\n2026-03-01,Ana,Vendedor 1,1,250,Acupuntura,Terapia,TERAPIA,250,20,230\n2026-03-01,Luis,Vendedor 2,2,180,Masajes,Masaje,TERAPIA,360,10,350\n2026-04-02,Ana,Vendedor 1,1,300,Consulta,Primera Consulta,P.CONSULTA,300,0,300\n2026-04-02,Mario,Vendedor 3,1,220,Farmacia,Suplemento,MEDICAMENTO,220,15,205\n2026-05-03,Sofia,Vendedor 2,3,150,Masajes,Masaje deportivo,TERAPIA,450,25,425\n2026-05-03,Carlos,Vendedor 1,1,400,Integral,Terapia integral,TERAPIA,400,40,360`; processRows(parseCsv(demoCsv), 'demo local'); }
+function attachEvents() {
+  document.getElementById('btnConectar').addEventListener('click', loadRemote); document.getElementById('btnRecargar').addEventListener('click', loadRemote); document.getElementById('btnDemo').addEventListener('click', loadDemo); document.getElementById('btnLimpiarFiltros').addEventListener('click', clearFilters);
+  ['filterMes','filterVendedor','filterDescripcion','filterTipo','filterSegmento'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+  document.getElementById('btnProcesarCsv').addEventListener('click', () => { const text = document.getElementById('csvInput').value.trim(); if (!text) { setStatus('Pega el contenido CSV antes de procesarlo.', 'error'); return; } try { processRows(parseCsv(text), 'CSV pegado manualmente'); } catch (err) { setStatus(`Error al procesar CSV pegado: ${err.message}`, 'error'); } });
+  document.getElementById('fileCsv').addEventListener('change', async e => { const file = e.target.files && e.target.files[0]; if (!file) return; try { const text = await file.text(); processRows(parseCsv(text), `archivo local ${file.name}`); } catch (err) { setStatus(`No se pudo leer el archivo local: ${err.message}`, 'error'); } });
+}
+function runTests() {
+  const sample = `a,b,"c,d"\n1,2,3`; const parsed = parseCsv(sample); console.assert(parsed.length === 2, 'Test parseCsv filas'); console.assert(parsed[0][2] === 'c,d', 'Test parseCsv comas entre comillas');
+  console.assert(toNumber('Q 1,250.50') === 1250.5, 'Test toNumber formato moneda'); console.assert(toNumber('15,5') === 15.5, 'Test toNumber decimal con coma'); console.assert(normalizeHeader(' 11_Descripcino ') === '11_descripcino', 'Test normalizeHeader');
+  const rows = parseCsv(`1_fecha;2_cliente;3_vendedor;4_unidades vendidas;9_codigo_segmento;10_tipo;11_Descripcino;10_1PrecioSinDescuento;10_2descuento;10_3Facturado\n3/01/2023;Ana;Luis;2;A1;Terapia;TERAPIA;200;10;190`); const data = aggregateData(rows); console.assert(data.ventas === 190, 'Test aggregateData ventas'); console.assert(data.sesiones === 2, 'Test aggregateData sesiones'); console.assert(data.clientesCount === 1, 'Test aggregateData clientes');
+  console.assert(parseDateLabel('2/04/2025 12:09') === '2025-04-02', 'Test parseDateLabel fecha y hora'); console.assert(monthLabel('2025-04-02') === '2025-04', 'Test monthLabel');
+}
+attachEvents(); runTests(); currentRows = buildRowsFromEmbedded(EMBEDDED_DATA); processDataObject(EMBEDDED_DATA, 'clinica_final.csv precargado');
+</script>
+</body>
+</html>
